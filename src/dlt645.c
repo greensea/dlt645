@@ -14,7 +14,7 @@
 
 #include<time.h>
 
-#include "ttyusb.h"
+#include "dlt645.h"
 
 
 /**

@@ -1,5 +1,5 @@
-#ifndef __TTYUSB_H__
-#define __TTYUSB_H__
+#ifndef __GREENSEA_DLT645_H__
+#define __GREENSEA_DLT645_H__
 
 
 
