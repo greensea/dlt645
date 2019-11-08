@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "src/ttyusb.h"
+#include "src/dlt645.h"
 
 
 int main() {
