@@ -15,7 +15,7 @@
 /**
  * 获取毫秒级的当前 UNIX 时间戳，单位：毫秒
  */
-long microtime();
+int64_t microtime();
 
 
 
@@ -53,5 +53,6 @@ int dlt645_close(int fd);
  */
 char* dlt645_bcd2str(const unsigned char *bcd, int len);
 
+int dlt645_set_speed(int fd, const unsigned char addr[6], int speed);
 
 #endif

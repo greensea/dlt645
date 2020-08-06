@@ -16,6 +16,9 @@
 
 #include "dlt645.h"
 
+#define DLT645_ADDR_LEN 6
+
+
 
 /**
  * 用于设定串口通讯参数的魔法般的代码，建议勿动
@@ -108,11 +111,14 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 /**
  * 获取当前时间戳，单位：秒
  */
-long microtime() {
+int64_t microtime() {
     struct timeval tv;
     gettimeofday(&tv, 0);
     
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    int64_t tv_sec = tv.tv_sec;
+    int64_t tv_usec = tv.tv_usec;
+
+    return tv_sec * 1000 + tv_usec / 1000;
 }
 
 
@@ -234,7 +240,7 @@ unsigned char* dlt645_read(int fd, const unsigned char addr[6], const unsigned c
     unsigned char d[128];
     int state = S_FE;
     int expect = 1;
-    long last_read_time = microtime();       /// 站点最后一次向我们发送数据的时间
+    int64_t last_read_time = microtime();       /// 站点最后一次向我们发送数据的时间
     
     while (1) {
         
@@ -464,10 +470,88 @@ char* dlt645_bcd2str(const unsigned char *bcd, int len) {
     for (int i = 0; i < len; i++) {
         snprintf(buf + i * 2, 3, "%02x", bcd[len - i - 1]);
     }
+
+    //printf("输入: ");
+    for (int i = 0; i < len; i++) {
+	    printf("%02x ", bcd[i]);
+    }
+    //printf("   , 输出: %s\n", buf);
         
     return buf;
 }
 
 
 
-
+/**
+ * 设置波特率
+ * 
+ * 成功返回 0，失败返回其他值
+ */
+int dlt645_set_speed(int fd, const unsigned char addr[6], int speed)
+{
+    unsigned char Z = 0;
+    
+    if (speed == 2400) {
+        Z = 0x08;
+    } else if (speed == 4800) {
+        Z = 0x10;
+    } else if (speed == 9600) {
+        Z = 0x20;
+    } else {
+        fprintf(stderr, "不支持此波特率: %d", speed);
+        return EINVAL;
+    }
+    
+    
+/*
+[发送]68 01 00 12 01 19 20 68 17 01 08 3D 16
+正确协议
+[发送]68 01 00 12 01 19 20 68 17 01 3B 70 16
+*/
+    
+        /// 1. 发送指令
+    /// 1.1 构建要写入的数据帧
+    unsigned char wbuf[] = {
+        0xFE, 0xFE, 0xFE, 0xFE,             /// 开头
+        0x68,                               /// 帧起始符
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /// 地址
+        0x68,                               /// 帧起始符
+        0x17, 0x01,                         /// 设置波特率指令 数据域长度 1 字节
+        Z,                                 /// 数据域 (D0)
+        0x00,                               /// 校验码
+        0x16                                /// 结束符
+    };
+    
+    /// 1.2 复制地址和数据域到要发送的数据帧中
+    memcpy(wbuf + 4 + 1, addr, DLT645_ADDR_LEN);
+    
+    /**
+     * 根据 DL/T 645 标准，对数据域进行 +0x33 操作
+     */
+    for (int i = 4 + 1 + 6 + 1 + 2; i < 4 + 1 + 6 + 1 + 2 + 1; i++) {
+        wbuf[i] += 0x33;
+    }
+    
+    /// 1.3 计算帧校验，并将校验值写入要发送的数据帧中
+    int checksum = 0;
+    for (int i = 4; i < sizeof(wbuf) - 2; i++) {
+        checksum += wbuf[i];
+    }
+    checksum = checksum % 256;
+    wbuf[sizeof(wbuf) - 2] = checksum;
+    
+    /// 2. 发送数据
+    int nwrite = write(fd, wbuf, sizeof(wbuf));
+    
+    if (nwrite <= 0) {
+        fprintf(stderr, "发送数据帧失败: %s\n", strerror(errno));
+        return errno;
+    } else if (nwrite != sizeof(wbuf)) {
+        fprintf(stderr, "未能发送完整的数据帧，本次只发送了 %d/%ld 字节，请重试\n", nwrite, sizeof(wbuf));
+        return errno;
+    }
+    
+    
+    /// TODO: 检查返回值是否成功
+    return 0;
+}
