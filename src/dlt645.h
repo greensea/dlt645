@@ -42,6 +42,16 @@ int dlt645_open(const char* dev, int baud, int dbit, char parity, int sbit);
  */
 unsigned char* dlt645_read(int fd, const unsigned char addr[6], const unsigned char cmd[4]);
 
+/**
+ * 设置通讯速率
+ *
+ * @param int                   已经打开的串口设备的文件描述符（使用 dlt645_open 方法打开）
+ * @param unsigned char[6]      设备地址
+ * @param int                   波特率
+ */
+int dlt645_set_speed(int fd, const unsigned char addr[6], int speed);
+
+
 int dlt645_close(int fd);
 
 

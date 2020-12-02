@@ -17,6 +17,8 @@
 #include "dlt645.h"
 
 
+#define DLT645_ADDR_LEN 6
+
 /**
  * 用于设定串口通讯参数的魔法般的代码，建议勿动
  * 这段代码是从网上某个地方复制来的，已经忘了出处了
@@ -144,6 +146,87 @@ int dlt645_open(const char* dev, int baud, int dbit, char parity, int sbit) {
 }
 
 /**
+ * 设置波特率
+ * 
+ * 成功返回 0，失败返回其他值
+ */
+int dlt645_set_speed(int fd, const unsigned char addr[6], int speed)
+{
+    unsigned char Z = 0;
+    
+    if (speed == 2400) {
+        Z = 0x08;
+    } else if (speed == 4800) {
+        Z = 0x10;
+    } else if (speed == 9600) {
+        Z = 0x20;
+    } else {
+        fprintf(stderr, "不支持此波特率: %d", speed);
+        return EINVAL;
+    }
+    
+    
+/*
+[发送]68 01 00 12 01 19 20 68 17 01 08 3D 16
+正确协议
+[发送]68 01 00 12 01 19 20 68 17 01 3B 70 16
+*/
+    
+        /// 1. 发送指令
+    /// 1.1 构建要写入的数据帧
+    unsigned char wbuf[] = {
+        0xFE, 0xFE, 0xFE, 0xFE,             /// 开头
+        0x68,                               /// 帧起始符
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /// 地址
+        0x68,                               /// 帧起始符
+        0x17, 0x01,                         /// 设置波特率指令 数据域长度 1 字节
+        Z,                                 /// 数据域 (D0)
+        0x00,                               /// 校验码
+        0x16                                /// 结束符
+    };
+    
+    /// 1.2 复制地址和数据域到要发送的数据帧中
+    memcpy(wbuf + 4 + 1, addr, DLT645_ADDR_LEN);
+    
+    /**
+     * 根据 DL/T 645 标准，对数据域进行 +0x33 操作
+     */
+    for (int i = 4 + 1 + 6 + 1 + 2; i < 4 + 1 + 6 + 1 + 2 + 1; i++) {
+        wbuf[i] += 0x33;
+    }
+    
+    /// 1.3 计算帧校验，并将校验值写入要发送的数据帧中
+    int checksum = 0;
+    for (int i = 4; i < sizeof(wbuf) - 2; i++) {
+        checksum += wbuf[i];
+    }
+    checksum = checksum % 256;
+    wbuf[sizeof(wbuf) - 2] = checksum;
+    
+    /// 2. 发送数据
+    int nwrite = write(fd, wbuf, sizeof(wbuf));
+    
+    if (nwrite <= 0) {
+        fprintf(stderr, "发送数据帧失败: %s\n", strerror(errno));
+        return errno;
+    } else if (nwrite != sizeof(wbuf)) {
+        fprintf(stderr, "未能发送完整的数据帧，本次只发送了 %d/%ld 字节，请重试\n", nwrite, sizeof(wbuf));
+        return errno;
+    }
+    
+    unsigned char buf[1024];
+    while (1) {
+        int readb = read(fd, buf, 1);
+        printf("%08x ", buf[0]);
+        buf[0] = 0x00;
+    }
+    
+    
+    /// TODO: 检查返回值是否成功
+    return 0;
+}
+
+/**
  * 读取一个数据
  * 
  * @param int                   已经打开的串口设备的文件描述符（使用 dlt645_open 方法打开）
@@ -153,7 +236,6 @@ int dlt645_open(const char* dev, int baud, int dbit, char parity, int sbit) {
  */
 unsigned char* dlt645_read(int fd, const unsigned char addr[6], const unsigned char cmd[4])
 {
-    int ADDR_LEN = 6;
     int CMD_LEN = 4;
         
     static unsigned char ret_buf[128];     /// 返回的数据指针
@@ -175,7 +257,7 @@ unsigned char* dlt645_read(int fd, const unsigned char addr[6], const unsigned c
     };
     
     /// 1.2 复制地址和数据域到要发送的数据帧中
-    memcpy(wbuf + 4 + 1, addr, ADDR_LEN);
+    memcpy(wbuf + 4 + 1, addr, DLT645_ADDR_LEN);
     memcpy(wbuf + 4 + 1 + 6 + 1 + 2, cmd, CMD_LEN);
     
     /**
