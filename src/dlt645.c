@@ -223,7 +223,7 @@ int dlt645_set_speed(int fd, const unsigned char addr[6], int speed)
     unsigned char buf[1024];
     while (1) {
         int readb = read(fd, buf, 1);
-        printf("%08x ", buf[0]);
+        //printf("%08x ", buf[0]);
         buf[0] = 0x00;
     }
     
@@ -555,7 +555,7 @@ char* dlt645_bcd2str(const unsigned char *bcd, int len) {
 
     //printf("输入: ");
     for (int i = 0; i < len; i++) {
-	    printf("%02x ", bcd[i]);
+	    //printf("%02x ", bcd[i]);
     }
     //printf("   , 输出: %s\n", buf);
         
