@@ -542,15 +542,24 @@ int dlt645_close(int fd) {
     return close(fd);
 }
 
-char* dlt645_bcd2str(const unsigned char *bcd, int len) {
+char* dlt645_bcd2str(const unsigned char *_bcd, int len) {
     static char buf[128];
+	unsigned char bcd[len];
     
     assert(len * 2 < sizeof(buf) - 1);
     
     memset(buf, 0x00, sizeof(buf));
-    
+	memcpy(bcd, _bcd, len);
+ 
+    if (bcd[len - 1] & 0x80) {
+		bcd[len - 1] &= ~0x80;
+		buf[0] = '-';
+	} else {
+		buf[0] = '0';
+	}
+
     for (int i = 0; i < len; i++) {
-        snprintf(buf + i * 2, 3, "%02x", bcd[len - i - 1]);
+        snprintf(buf + i * 2 + 1, 3, "%02x", bcd[len - i - 1]);
     }
 
     //printf("输入: ");
