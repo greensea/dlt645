@@ -28,7 +28,7 @@
  */
 int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 {
-    fprintf(stderr, "设定串口通讯参数为: speed = %d, nBits = %d, parity = %c, stopBits = %d\n", nSpeed, nBits, nEvent, nStop);
+    fprintf(stderr, "使用的串口通讯参数为: speed = %d, nBits = %d, parity = %c, stopBits = %d\n", nSpeed, nBits, nEvent, nStop);
     
     struct termios newtio,oldtio;
     if  ( tcgetattr( fd,&oldtio)  !=  0) { 
